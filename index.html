@@ -404,9 +404,6 @@
         const callGeminiApiWithBackoff = async (payload, retries = 3, initialDelay = 1000) => {
             // IMPORTANT: Replace this with your actual Gemini API Key for local development.
             // For the Canvas environment, leave it as an empty string.
-            const apiKey = "AIzaSyBh5e0wwtjqYhGQJUA4bLRDmr9JHO18OwQ"; // <--- REMEMBER TO ADD YOUR API KEY HERE FOR LOCAL TESTING!
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
             let delay = initialDelay;
 
             for (let i = 0; i < retries; i++) {
@@ -523,30 +520,47 @@
         }
 
         async function fetchRecommendations() {
-            recommendationsContent.innerHTML = `
-                <div class="loading-spinner">
-                    <div class="spinner"></div>
-                    <span>Loading suggestions...</span>
-                </div>
-            `;
+    recommendationsContent.innerHTML = `
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <span>Loading suggestions...</span>
+        </div>
+    `;
 
-            const prompt = `Provide top 3 recommendations for a ${selectedCategory} with a top priority on ${selectedPriority}. Format the response as a clear, concise list, for example: "1. Product Name (Key Feature) - Brief description. 2. ... 3. ..." If you cannot provide a recommendation, state "No matching devices found."`;
+    const prompt = `Provide top 3 recommendations for a ${selectedCategory} with a top priority on ${selectedPriority}. Format the response as a clear, concise list, for example: "1. Product Name (Key Feature) - Brief description. 2. ... 3. ..." If you cannot provide a recommendation, state "No matching devices found."`;
 
-            const chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
-            const payload = { contents: chatHistory };
+    const chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+    const payload = { contents: chatHistory };
 
-            try {
-                const text = await callGeminiApiWithBackoff(payload);
-                if (text && text.trim() !== "No matching devices found.") {
-                    recommendationsContent.innerHTML = `<div class="recommendations-text">${text}</div>`;
-                } else {
-                    recommendationsContent.innerHTML = `<p class="no-devices-found">No matching devices found.</p>`;
-                }
-            } catch (err) {
-                console.error("Error fetching recommendations:", err);
-                recommendationsContent.innerHTML = `<p class="error-message">Failed to load suggestions. Please try again.</p>`;
-            }
+    try {
+        // 🔒 Call your backend instead of Google directly
+        const response = await fetch("/api/recommend", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+
+        const result = await response.json();
+
+        // Extract the text from the response (matches Gemini API structure)
+        if (
+            result.candidates &&
+            result.candidates.length > 0 &&
+            result.candidates[0].content &&
+            result.candidates[0].content.parts &&
+            result.candidates[0].content.parts.length > 0
+        ) {
+            const text = result.candidates[0].content.parts[0].text;
+            recommendationsContent.innerHTML = `<div class="recommendations-text">${text}</div>`;
+        } else {
+            recommendationsContent.innerHTML = `<p class="no-devices-found">No matching devices found.</p>`;
         }
+    } catch (err) {
+        console.error("Error fetching recommendations:", err);
+        recommendationsContent.innerHTML = `<p class="error-message">Failed to load suggestions. Please try again.</p>`;
+    }
+}
+
 
         function handleCategoryClick(category) {
             selectedCategory = category;
